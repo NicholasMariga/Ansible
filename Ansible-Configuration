@@ -1,0 +1,26 @@
+
+#####  Ansible Configuration #####
+
+//Add the Ansible repo (prefferred)
+vi public_***.repo
+[Ansible]
+name=Ansible releases repo
+baseurl=http://releases.ansible.com/ansible/rpm/release/epel-7-$basearch/
+gpgkey=http://releases.ansible.com/keys/RPM-GPG-KEY-ansible-release.pub
+gpgcheck=1
+enabled=1
+
+yum install -y ansible
+ansible --version
+
+//Generate ssh keys for the node (manager)
+ssh-keygen
+
+//Ensure there is a communication between manager node and node to be managed
+ssh-copy-id root@<node-to-be-managed>
+
+//Update the hosts file with <node-to-be-managed> 
+
+//Check connectivity
+ansible -m ping all
+
