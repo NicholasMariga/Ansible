@@ -1,0 +1,41 @@
+---
+- name: Install and configure Wazuh agent
+  hosts: servers
+  become: yes
+  tasks:
+    - name: Create wazuh directory
+      file:
+        path: /wazuh
+        state: directory
+        mode: '0755'
+
+    - name: Change to wazuh directory
+      command: /bin/true
+      args:
+        chdir: /wazuh
+
+    - name: Download Wazuh agent RPM
+      get_url:
+        url: https://packages.wazuh.com/4.x/yum/wazuh-agent-4.8.0-1.x86_64.rpm
+        dest: /wazuh/wazuh-agent-4.8.0-1.x86_64.rpm
+
+    - name: Install Wazuh agent
+      command: rpm -ihv /wazuh/wazuh-agent-4.8.0-1.x86_64.rpm
+      environment:
+        WAZUH_MANAGER: '10.176.18.48'
+        WAZUH_AGENT_GROUP: 'SERVERS'
+
+    - name: Reload systemd manager configuration
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable wazuh-agent service
+      systemd:
+        name: wazuh-agent
+        enabled: yes
+
+    - name: Start wazuh-agent service
+      systemd:
+        name: wazuh-agent
+        state: started
+

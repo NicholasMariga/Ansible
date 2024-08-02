@@ -1,0 +1,32 @@
+
+
+---
+- name: Create user with specified username and password and add to wheel group
+  hosts: servers 
+  become: yes
+  vars_prompt:
+    - name: "username"
+      prompt: "Enter the username"
+      private: no
+    - name: "user_password"
+      prompt: "Enter the password"
+      private: yes
+  tasks:
+    - name: Check if user {{ username }} exists
+      command: getent passwd {{ username }}
+      register: user_exists
+      ignore_errors: yes
+
+    - name: Create user {{ username }} with password if does not exists
+      user:
+        name: "{{ username }}"
+        password: "{{ user_password | password_hash('sha512') }}"
+        groups: wheel
+        append: yes
+      when: user_exists.rc != 0
+
+    - name: Notify user already exists
+      debug:
+        msg: "User {{ username }} already exists"
+      when: user_exists.rc == 0
+

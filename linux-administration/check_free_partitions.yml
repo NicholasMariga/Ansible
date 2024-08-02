@@ -1,0 +1,14 @@
+---
+- name: Check free partitions on the server
+  hosts: servers
+  become: yes
+
+  tasks:
+    - name: Check free disk space
+      command: df -h
+      register: df_result
+
+    - name: Display free disk space
+      debug:
+        var: df_result.stdout_lines
+

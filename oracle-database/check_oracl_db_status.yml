@@ -1,0 +1,25 @@
+---
+- name: Check if Oracle Database is running
+  hosts: servers
+  become: yes
+
+  tasks:
+    - name: Check Oracle Database processes
+      shell: ps -ef | grep -E 'ora_pmon|ora_smon' | grep -v grep
+      register: oracle_processes
+      ignore_errors: yes
+
+    - name: Display Oracle Database processes
+      debug:
+        var: oracle_processes.stdout_lines
+
+    - name: Fail if Oracle Database processes are not found
+      fail:
+        msg: "Oracle Database is not running."
+      when: oracle_processes.stdout_lines | length == 0
+
+    - name: Oracle Database is running
+      debug:
+        msg: "Oracle Database is running."
+      when: oracle_processes.stdout_lines | length > 0
+

@@ -1,0 +1,22 @@
+
+
+---
+- name: Check internet connectivity strength
+  hosts: servers 
+  become: yes
+  gather_facts: no
+  tasks:
+    - name: Ping Google's DNS server to check internet connectivity
+      command: ping -c 4 8.8.8.8
+      register: ping_result
+      ignore_errors: yes
+
+    - name: Display ping result
+      debug:
+        var: ping_result.stdout_lines
+
+    - name: Fail if ping to Google's DNS server fails
+      fail:
+        msg: "Internet connectivity test failed. Unable to ping 8.8.8.8."
+      when: ping_result.rc != 0
+

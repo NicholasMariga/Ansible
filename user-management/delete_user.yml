@@ -1,0 +1,28 @@
+
+
+---
+- name: Delete user and home directory
+  hosts: servers
+  become: yes
+  vars_prompt:
+    - name: "username"
+      prompt: "Enter the username to delete"
+      private: no
+  tasks:
+    - name: Check if user {{ username }} exists
+      command: getent passwd {{ username }}
+      register: user_exists
+      ignore_errors: yes
+
+    - name: Delete user {{ username }} if exists
+      user:
+        name: "{{ username }}"
+        state: absent
+        remove: yes  # Ensure home directory is removed
+      when: user_exists.rc == 0
+
+    - name: Notify if user {{ username }} does not exist
+      debug:
+        msg: "User {{ username }} does not exist"
+      when: user_exists.rc != 0
+

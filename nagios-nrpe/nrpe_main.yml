@@ -1,0 +1,253 @@
+---
+- name: Install required packages
+  hosts: servers
+  become: yes
+
+  vars:
+    required_packages:
+      - gcc
+      - glibc
+      - glibc-common
+      - make
+      - gettext
+      - automake
+      - autoconf
+      - wget
+      - openssl-devel
+      - net-snmp
+      - net-snmp-utils
+      - libtool
+      - xinetd
+
+  tasks:
+    - name: Install required packages
+      yum:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ required_packages }}"
+
+- name: Setup Nagios Plugins
+  hosts: 10.176.16.129
+  become: yes
+
+  tasks:
+    - name: Create directory for Nagios
+      file:
+        path: /tmp/nagios
+        state: directory
+
+    - name: Download Nagios Plugins archive
+      get_url:
+        url: https://github.com/nagios-plugins/nagios-plugins/archive/release-2.4.6.tar.gz
+        dest: /tmp/nagios/nagios-plugins.tar.gz
+        force: yes
+        validate_certs: no
+
+    - name: Extract Nagios Plugins archive
+      unarchive:
+        src: /tmp/nagios/nagios-plugins.tar.gz
+        dest: /tmp/nagios
+        remote_src: yes
+        creates: /tmp/nagios/nagios-plugins-release-2.4.6
+
+    - name: Change directory to Nagios Plugins source
+      become: no
+      shell: cd /tmp/nagios/nagios-plugins-release-2.4.6
+      args:
+        chdir: /tmp/nagios/nagios-plugins-release-2.4.6
+
+    - name: Run setup script
+      shell: ./tools/setup
+      args:
+        chdir: /tmp/nagios/nagios-plugins-release-2.4.6
+      become: yes
+
+    - name: Configure Nagios Plugins
+      shell: ./configure
+      args:
+        chdir: /tmp/nagios/nagios-plugins-release-2.4.6
+      become: yes
+
+    - name: Build Nagios Plugins
+      make:
+        chdir: /tmp/nagios/nagios-plugins-release-2.4.6
+      become: yes
+
+    - name: Install Nagios Plugins
+      make:
+        chdir: /tmp/nagios/nagios-plugins-release-2.4.6
+        target: install
+      become: yes
+
+- name: Configure Nagios User and Group
+  hosts: 10.176.16.129
+  become: yes
+
+  tasks:
+    - name: Add Nagios group
+      group:
+        name: nagios
+        state: present
+
+    - name: Add Nagios user
+      user:
+        name: nagios
+        group: nagios
+        createhome: no
+        shell: /bin/false
+
+    - name: Change ownership of Nagios directory
+      file:
+        path: /usr/local/nagios
+        owner: nagios
+        group: nagios
+        recurse: yes
+
+    - name: Change ownership of Nagios libexec directory
+      file:
+        path: /usr/local/nagios/libexec
+        owner: nagios
+        group: nagios
+        recurse: yes
+
+
+- name: Setup NRPE
+  hosts: 10.176.16.129
+  become: yes
+
+  tasks:
+    - name: Create directory for NRPE
+      file:
+        path: /tmp/nagios
+        state: directory
+
+    - name: Download NRPE source
+      get_url:
+        url: https://github.com/NagiosEnterprises/nrpe/releases/download/nrpe-4.1.0/nrpe-4.1.0.tar.gz
+        dest: /tmp/nagios/nrpe-4.1.0.tar.gz
+
+    - name: Extract NRPE source
+      unarchive:
+        src: /tmp/nagios/nrpe-4.1.0.tar.gz
+        dest: /tmp/nagios
+        remote_src: yes
+        creates: /tmp/nagios/nrpe-4.1.0
+
+    - name: Change directory to NRPE source
+      shell: cd /tmp/nagios/nrpe-4.1.0
+      args:
+        chdir: /tmp/nagios/nrpe-4.1.0
+
+    - name: Run configure script
+      command: ./configure
+      args:
+        chdir: /tmp/nagios/nrpe-4.1.0
+
+    - name: Make all
+      make:
+        chdir: /tmp/nagios/nrpe-4.1.0
+        target: all
+
+    - name: Install groups and users
+      make:
+        chdir: /tmp/nagios/nrpe-4.1.0
+        target: install-groups-users
+
+    - name: Install NRPE
+      make:
+        chdir: /tmp/nagios/nrpe-4.1.0
+        target: install
+
+    - name: Install NRPE config
+      make:
+        chdir: /tmp/nagios/nrpe-4.1.0
+        target: install-config
+
+    - name: Install inetd NRPE config
+      make:
+        chdir: /tmp/nagios/nrpe-4.1.0
+        target: install-inetd
+
+    - name: Install init NRPE config
+      make:
+        chdir: /tmp/nagios/nrpe-4.1.0
+        target: install-init
+
+
+- name: Restart xinetd and start NRPE service
+  hosts: 10.176.16.129
+  become: yes
+
+  tasks:
+    - name: Restart xinetd service
+      service:
+        name: xinetd
+        state: restarted
+
+    - name: Check xinetd service status
+      service:
+        name: xinetd
+        state: started
+        enabled: yes
+        daemon_reload: yes
+
+    - name: Enable and start NRPE service
+      service:
+        name: nrpe
+        state: started
+        enabled: yes
+
+    - name: Check NRPE service status
+      service:
+        name: nrpe
+        state: started
+        enabled: yes
+
+- name: Update allowed_hosts in nrpe.cfg
+  hosts: 10.176.16.129
+  become: yes
+
+  tasks:
+    - name: Update allowed_hosts in nrpe.cfg
+      lineinfile:
+        path: /usr/local/nagios/etc/nrpe.cfg
+        regexp: '^allowed_hosts'
+        line: 'allowed_hosts=127.0.0.1,10.176.18.150'
+        backup: yes
+
+- name: Update NRPE configuration in xinetd.d and restart NRPE service
+  hosts: 10.176.16.129
+  become: yes
+
+  tasks:
+    - name: Update disable to no in nrpe configuration
+      replace:
+        path: /etc/xinetd.d/nrpe
+        regexp: '^\s*disable\s*=\s*yes\s*$'
+        replace: '    disable         = no'
+      notify: Restart xinetd
+
+    - name: Update only_from in nrpe configuration
+      replace:
+        path: /etc/xinetd.d/nrpe
+        regexp: '^\s*only_from\s*=\s*127.0.0.1\s*::1\s*$'
+        replace: '    only_from       = 127.0.0.1 10.176.18.150'
+      notify: Restart xinetd
+
+  handlers:
+    - name: Restart xinetd
+      service:
+        name: xinetd
+        state: restarted
+
+    - name: Restart NRPE service
+      service:
+        name: nrpe
+        state: restarted
+
+    - name: Enable NRPE service
+      service:
+        name: nrpe
+        enabled: yes
+
+

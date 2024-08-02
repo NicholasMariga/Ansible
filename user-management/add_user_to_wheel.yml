@@ -1,0 +1,33 @@
+---
+- name: Add user to wheel group
+  hosts: servers
+  become: yes
+  vars_prompt:
+    - name: "username"
+      prompt: "Enter the username to add to wheel group"
+      private: no
+  tasks:
+    - name: Check if user {{ username }} exists
+      command: getent passwd {{ username }}
+      register: user_exists
+      ignore_errors: yes
+
+    - name: Add user {{ username }} to wheel group
+      user:
+        name: "{{ username }}"
+        groups: wheel
+        append: yes
+      when: user_exists.rc == 0
+
+    - name: Notify if user {{ username }} does not exist
+      debug:
+        msg: "User {{ username }} does not exist"
+      when: user_exists.rc != 0
+
+    - name: Notify if user {{ username }} is already in wheel group
+      debug:
+        msg: "User {{ username }} is already in wheel group"
+      when:
+        - user_exists.rc == 0
+        - "'wheel' in user_exists.stdout"
+

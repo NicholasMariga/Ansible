@@ -1,0 +1,43 @@
+
+---
+- name: Install and configure Apache HTTP Server
+  hosts: servers
+  become: yes
+
+  tasks:
+    - name: Update system packages
+      yum:
+        name: "*"
+        state: latest
+
+    - name: Install httpd package
+      yum:
+        name: httpd
+        state: present
+
+    - name: Start httpd service
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: Allow HTTP and HTTPS traffic in firewall
+      firewalld:
+        service: "{{ item }}"
+        state: enabled
+        immediate: yes
+        permanent: yes
+      with_items:
+        - http
+        - https
+
+    - name: Reload firewall
+      service:
+        name: firewalld
+        state: reloaded
+
+    - name: Check httpd service status
+      systemd:
+        name: httpd
+        state: started
+

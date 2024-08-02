@@ -1,0 +1,41 @@
+---
+- name: Remove user from wheel group
+  hosts: servers
+  become: yes
+  vars_prompt:
+    - name: "username"
+      prompt: "Enter the username to remove from wheel group"
+      private: no
+  tasks:
+    - name: Check if user {{ username }} exists
+      command: getent passwd {{ username }}
+      register: user_exists
+      ignore_errors: yes
+
+    - name: Check if user {{ username }} is in wheel group
+      command: id -nG {{ username }}
+      register: user_groups
+      when: user_exists.rc == 0
+      ignore_errors: yes
+
+    - name: Remove user {{ username }} from wheel group if they are a member
+      user:
+        name: "{{ username }}"
+        groups: "{{ user_groups.stdout | regex_replace('wheel', '') | regex_replace('\\s+', ',') }}"
+        append: no
+      when:
+        - user_exists.rc == 0
+        - "'wheel' in user_groups.stdout.split()"
+
+    - name: Notify if user {{ username }} does not exist
+      debug:
+        msg: "User {{ username }} does not exist"
+      when: user_exists.rc != 0
+
+    - name: Notify if user {{ username }} is not in wheel group
+      debug:
+        msg: "User {{ username }} is not in wheel group"
+      when:
+        - user_exists.rc == 0
+        - "'wheel' not in user_groups.stdout.split()"
+

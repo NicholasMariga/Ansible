@@ -1,0 +1,15 @@
+---
+- name: Check Wazuh agent status
+  hosts: servers
+  become: yes
+  tasks:
+    - name: Check if wazuh-agent service is running
+      shell: systemctl is-active wazuh-agent
+      register: wazuh_agent_status
+      changed_when: false
+      check_mode: no
+
+    - name: Display service status
+      debug:
+        msg: "Wazuh agent is {{ 'running' if wazuh_agent_status.stdout == 'active' else 'not running' }} ({{ wazuh_agent_status.stdout }})."
+

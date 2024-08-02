@@ -1,0 +1,12 @@
+---
+- name: Allow port 1521 in firewall
+  hosts: servers
+  become: yes
+
+  tasks:
+    - name: Add port 1521 to firewalld
+      firewalld:
+        port: 1521/tcp
+        state: enabled
+        permanent: yes
+
