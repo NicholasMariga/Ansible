@@ -1,0 +1,53 @@
+---
+- name: Harden Apache HTTP Server
+  hosts: webservers
+  become: true
+
+  tasks:
+
+    - name: Ensure Apache is installed
+      package:
+        name: "{{ ansible_os_family == 'RedHat' | ternary('httpd', 'apache2') }}"
+        state: present
+
+    - name: Disable server signature and tokens
+      lineinfile:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: '^ServerTokens'
+        line: 'ServerTokens Prod'
+        state: present
+      when: ansible_os_family == 'RedHat'
+
+    - name: Disable server signature
+      lineinfile:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: '^ServerSignature'
+        line: 'ServerSignature Off'
+        state: present
+      when: ansible_os_family == 'RedHat'
+
+    - name: Disable directory listing
+      replace:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: 'Options Indexes'
+        replace: 'Options -Indexes'
+      when: ansible_os_family == 'RedHat'
+
+    - name: Set secure permissions on web root
+      file:
+        path: /var/www/html
+        owner: apache
+        group: apache
+        mode: '0750'
+        recurse: yes
+
+    - name: Remove default Apache test page
+      file:
+        path: /var/www/html/index.html
+        state: absent
+
+    - name: Enable and restart Apache
+      service:
+        name: httpd
+        state: restarted
+        enabled: yes
